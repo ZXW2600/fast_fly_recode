@@ -1,0 +1,3 @@
+fast_fly.egg-info/**
+**/__pycache__/**
+**/build/**
