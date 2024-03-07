@@ -4,9 +4,11 @@ import casadi as ca
 from fast_fly.utils.logger import Logger
 from fast_fly.utils.math import QuadraticError
 
+from fast_fly.utils.utils import flatten
+
 
 class OptimalVariables(Logger):
-    def __init__(self, name, default_init=None, default_ub=None, default_lb=None, param=False) -> None:
+    def __init__(self, name, default_init=None, default_ub=None, default_lb=None, param=False,headers=None) -> None:
         super().__init__(name)
         self.state_list = []
         self.state_init_list = []
@@ -20,6 +22,8 @@ class OptimalVariables(Logger):
         self.default_ub = default_ub
         self.default_lb = default_lb
         self.param = param
+        self.headers=headers
+
 
     def addState(self, symbo, init=None, ub=None, lb=None):
         if init is None:
@@ -49,6 +53,7 @@ class OptimalVariables(Logger):
         self.state_init_list.append(init)
         self.state_ub_list.append(ub)
         self.state_lb_list.append(lb)
+        self.debug(f"add state {symbo} init {init} ub {ub} lb {lb}")
 
     def getSymbolicState(self):
         return self.state_list
@@ -71,10 +76,10 @@ class OptimalVariables(Logger):
     def getResult(self):
         return self.state_result_list
         # return self.state_result_list.tolist()
-    
-    def result(self,i):
-        return self.state_result_list[i,:]
-    
+
+    def result(self, i):
+        return self.state_result_list[i, :]
+
     def state(self, index: int):
         return self.state_list[index]
 
@@ -142,14 +147,6 @@ class OptimalObject(Logger):
 
     def setObject(self, error):
         self.obj = self.weight@error
-
-
-def flatten(xss):
-    if not isinstance(xss, list):
-        return [xss]
-    elif not isinstance(xss[0], list):
-        return xss
-    return [x for xs in xss for x in xs]
 
 
 class OptimalProblem(Logger):

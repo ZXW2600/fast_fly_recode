@@ -8,6 +8,8 @@ from fast_fly.utils.math import constrain
 from fast_fly.utils.integral import EulerIntegral, RK4
 from fast_fly.utils.yaml_helper import ConfigReader
 
+from acados_template import AcadosModel
+
 
 class State:
     X_pos = slice(0, 3)
@@ -157,3 +159,56 @@ class QuadrotorModel(object):
         X1[6:10] = X1[6:10]/q_l
 
         return ca.Function("ddyn_t", [X0, U, dt], [X1], ["X0", "U", "dt"], ["X1"])
+
+    def cacados_model(self):
+        px, py, pz = ca.SX.sym('px'), ca.SX.sym('py'), ca.SX.sym('pz')
+        vx, vy, vz = ca.SX.sym('vx'), ca.SX.sym('vy'), ca.SX.sym('vz')
+        qw, qx, qy, qz = ca.SX.sym('qw'), ca.SX.sym('qx'), ca.SX.sym('qy'), ca.SX.sym('qz')  # noqa
+        wx, wy, wz = ca.SX.sym('wx'), ca.SX.sym('wy'), ca.SX.sym('wz')
+
+        T1, T2, T3, T4 = ca.SX.sym('T1'), ca.SX.sym('T2'), ca.SX.sym('T3'), ca.SX.sym('T4')  # noqa
+
+        taux = self._arm_l/np.sqrt(2)*(T1+T4-T2-T3)
+        tauy = self._arm_l/np.sqrt(2)*(T1+T3-T2-T4)
+        tauz = self._c_tau*(T3+T4-T1-T2)
+        thrust = (T1+T2+T3+T4)
+
+        tau = ca.veccat(taux, tauy, tauz)
+        w = ca.veccat(wx, wy, wz)
+        w_dot = self._J_inv@(tau - ca.cross(w, self._J@w))
+
+        fdrag = rotate_quat(ca.veccat(qw, qx, qy, qz), self._D @
+                            rotate_quat(ca.veccat(qw, -qx, -qy, -qz), ca.veccat(vx, vy, vz)))
+
+        f_expl = ca.vertcat(
+            vx,
+            vy,
+            vz,
+            2 * (qw * qy + qx * qz) * (-thrust/self._m) - fdrag[0],
+            2 * (qy * qz - qw * qx) * (-thrust/self._m) - fdrag[1],
+            (qw * qw - qx * qx - qy * qy + qz * qz) *
+            (-thrust/self._m) + self._G - fdrag[2],
+            0.5 * (-wx * qx - wy * qy - wz * qz),
+            0.5 * (wx * qw + wz * qy - wy * qz),
+            0.5 * (wy * qw - wz * qx + wx * qz),
+            0.5 * (wz * qw + wy * qx - wx * qy),
+            w_dot[0],
+            w_dot[1],
+            w_dot[2]
+        )
+
+        X = ca.vertcat(px, py, pz,
+                       vx, vy, vz,
+                       qw, qx, qy, qz,
+                       wx, wy, wz)
+        U = ca.vertcat(T1, T2, T3, T4)
+
+        X_dot_sym = ca.SX.sym('X_dot', f_expl.shape[0])
+        model = AcadosModel()
+        model.f_impl_expr = X_dot_sym-f_expl
+        model.f_expl_expr = f_expl
+        model.x = X
+        model.u = U
+        model.xdot = X_dot_sym
+        model.name = 'quadcopter'
+        return model
