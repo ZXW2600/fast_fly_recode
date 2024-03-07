@@ -51,6 +51,7 @@ class Logger:
 
     def exception(self, msg):
         self.logger.exception(msg)
+        raise Exception(msg)
     
     def log(self, level, msg):
         self.logger.log(level, msg)
