@@ -6,29 +6,15 @@ from fast_fly.utils.logger import getLogger
 from fast_fly.utils.geometery import quat_mult, rotate_quat
 from fast_fly.utils.math import constrain
 from fast_fly.utils.integral import EulerIntegral, RK4
+from fast_fly.utils.yaml_helper import ConfigReader
 
 
-class ConfigReader:
-    def __init__(self, yaml_path) -> None:
-        self.logger = getLogger("ConfigReader")
-        with open(yaml_path, 'r') as f:
-            self.yaml_cfg = yaml.load(f, Loader=yaml.FullLoader)
-        self.logger.info(f"load params from file {yaml_path}")
-
-    def load_param(self, param_name, default: Optional[Any] = None):
-        if param_name in self.yaml_cfg:
-            value = self.yaml_cfg[param_name]
-            self.logger.info(f"Read value from file {param_name} : {default}")
-
-        elif default is not None:
-            value = default
-            self.logger.warn(f"Using default value for {param_name} : {default}")  # noqa
-        else:
-            self.logger.error(
-                f"Parameter {param_name} not found in config file")
-            raise ValueError(
-                f"Parameter {param_name} not found in config file")
-        return value
+class State:
+    X_pos = slice(0, 3)
+    X_vel = slice(3, 6)
+    X_quat = slice(6, 10)
+    X_omega = slice(10, 13)
+    U = slice(0, 4)
 
 
 class QuadrotorModel(object):
@@ -65,7 +51,10 @@ class QuadrotorModel(object):
                       self._v_xy_max, self._v_xy_max, self._v_z_max,
                       1, 1, 1, 1,
                       self._omega_xy_max, self._omega_xy_max, self._omega_z_max]
-
+        self._X_init = [0, 0, 0,  # noqa
+                                    0, 0, 0,  # noqa
+                                    1, 0, 0, 0,  # noqa
+                                    0, 0, 0]  # noqa
         self._U_lb = [self._T_min, self._T_min, self._T_min, self._T_min]
         self._U_ub = [self._T_max, self._T_max, self._T_max, self._T_max]
 
@@ -77,13 +66,14 @@ class QuadrotorModel(object):
     #     /  \
     #   T4    T2
     #
-    # 
+    #
+
     def f_dynamics(self):
         """dynamics function for quadrotor
 
         Returns:
             _type_: casdia.Function
-        """        
+        """
         px, py, pz = ca.SX.sym('px'), ca.SX.sym('py'), ca.SX.sym('pz')
         vx, vy, vz = ca.SX.sym('vx'), ca.SX.sym('vy'), ca.SX.sym('vz')
         qw, qx, qy, qz = ca.SX.sym('qw'), ca.SX.sym('qx'), ca.SX.sym('qy'), ca.SX.sym('qz')  # noqa
@@ -129,7 +119,6 @@ class QuadrotorModel(object):
         fx = ca.Function('f', [X, U], [X_dot], ['X', 'U'], ['X_dot'])
         return fx
 
-
     def d_dynamics(self, dt):
         """discrete time dynamics function for quadrotor with constant dt
 
@@ -138,33 +127,33 @@ class QuadrotorModel(object):
 
         Returns:
             Function: _description_
-        """        
-        f = self.dynamics()
+        """
+        f = self.f_dynamics()
         X0 = ca.SX.sym("X", f.size1_in(0))
         U = ca.SX.sym("U", f.size1_in(1))
-        
+
         X1 = RK4(f, X0, U, dt, 1)
         # X1 = EulerIntegral(f, X0, U, dt, 1)
         q_l = ca.sqrt(X1[6:10].T@X1[6:10])
         X1[6:10] = X1[6:10]/q_l
-        
+
         return ca.Function("ddyn", [X0, U], [X1], ["X0", "U"], ["X1"])
-    
+
     def d_dynamics_dt(self):
         """discrete time dynamics function for quadrotor with varying dt
 
         Returns:
             Function: _description_
-        """        
-        f = self.dynamics()
+        """
+        f = self.f_dynamics()
         X0 = ca.SX.sym("X", f.size1_in(0))
         U = ca.SX.sym("U", f.size1_in(1))
         dt = ca.SX.sym('dt')
-        
+
         # X1 = RK4(f, X0, U, dt, 1)
         X1 = EulerIntegral(f, X0, U, dt, 1)
-        
+
         q_l = ca.sqrt(X1[6:10].T@X1[6:10])
         X1[6:10] = X1[6:10]/q_l
-        
+
         return ca.Function("ddyn_t", [X0, U, dt], [X1], ["X0", "U", "dt"], ["X1"])
