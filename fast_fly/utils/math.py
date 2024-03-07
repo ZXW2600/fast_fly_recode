@@ -8,5 +8,5 @@ def constrain(a, lb, ub):
 
 
 def QuadraticError(error):
-    error.T @ error
+    return error.T @ error
     

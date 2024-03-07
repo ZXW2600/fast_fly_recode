@@ -42,7 +42,7 @@ class Trajectory:
         self.input = input.getResult()
         self.dT = dT.getResult()
         self.dt_list = []
-        if self.dT == None:
+        if self.dT is None:
             self.dT = dT.getInitState()
         for i, n_sample in enumerate(time_samples):
             dT_i = self.dT[i]
@@ -65,6 +65,8 @@ class DronePathPlanner(Logger):
     def __init__(self, quadcopter: QuadrotorModel, time_allocater: TimeAllocater, waypoints: list[tuple[float, float, float,] | list[float]], loop: bool, ) -> None:
         super().__init__("DronePathPlanner")
         self.quadcopter = quadcopter
+        # self.quadcopter.set_up_cacados()
+
         self.time_allocater = time_allocater
         self.waypoints = waypoints
         self.debug(f"waypoints: {waypoints}")
@@ -102,12 +104,12 @@ class DronePathPlanner(Logger):
             "waypoint_pos", default_init=self.waypoints, param=True)
 
         self.opt_dynamic_constraints = OptimalConstraints(
-            "dynamic", default_lb=[0] * self.dim_sym_x, default_ub=[0] * self.dim_sym_x)
+            "dynamic", default_lb=[0]*self.dim_sym_x, default_ub=[0]*self.dim_sym_x)
         self.opt_dynamic_obj = OptimalQuadraticObject(
             "dynamic", ca.diag([1]*self.dim_sym_x))
 
         self.opt_waypoint_tol_constraints = OptimalConstraints(
-            "waypoint_tol", default_lb=[0], default_ub=self.waypoint_tol**2)
+            "waypoint_tol", default_lb=[0]*3, default_ub=[self.waypoint_tol**2]*3)
 
         self.opt_waypoint_tol_obj = OptimalQuadraticObject(
             "waypoint_tol", weight=ca.diag([1, 1, 1]))
@@ -153,8 +155,8 @@ class DronePathPlanner(Logger):
             self.opt_waypoint_tol_obj.addToObjective(
                 error=waypoint_start_state[State.X_pos]-segment_start
             )
-            self.opt_waypoint_tol_constraints.addConstraint(QuadraticError(
-                waypoint_start_state[State.X_pos]-segment_start)
+            self.opt_waypoint_tol_constraints.addConstraint(
+                waypoint_start_state[State.X_pos]-segment_start
             )
             # add dynamic constrain to the problem
             for index_path in range(current_segment_start, next_segment_start):
@@ -175,8 +177,8 @@ class DronePathPlanner(Logger):
                     state_next = self.sym_mat_x[:, index_path+1]
                     self.debug(f"add dynamic constrain from state {index_path} to {index_path+1}")  # noqa
 
-                self.opt_dynamic_constraints.addConstraint(QuadraticError(
-                    self.f_dynamics(state_now, input_now, dT)-state_next)
+                self.opt_dynamic_constraints.addConstraint(
+                    self.f_dynamics(state_now, input_now, dT)-state_next
                 )
                 self.opt_dynamic_obj.addToObjective(
                     self.f_dynamics(state_now, input_now, dT)-state_next
@@ -242,8 +244,8 @@ class DronePathPlanner(Logger):
                 state_next = self.sym_mat_x[:, index_path+1]
 
                 self.debug(f"add dynamic constrain from state {index_path} to {index_path+1}")  # noqa
-                self.opt_dynamic_constraints.addConstraint(QuadraticError(
-                    self.f_dynamics(state_now, input_now, dT)-state_next)
+                self.opt_dynamic_constraints.addConstraint(
+                    self.f_dynamics(state_now, input_now, dT)-state_next
                 )
                 self.opt_dynamic_obj.addToObjective(
                     self.f_dynamics(state_now, input_now, dT)-state_next
@@ -270,10 +272,15 @@ class DronePathPlanner(Logger):
             self.opt_State, self.opt_Input, self.opt_dT, self.sample_list)
         self.warmup_traj.save(csv_path)
 
+    def saveOptimal(self, csv_path):
+        self.opt_traj = Trajectory(
+            self.opt_State, self.opt_Input, self.opt_dT, self.sample_list)
+        self.opt_traj.save(csv_path)
+
     def getOptimalProblem(self):
         self.info("setup optimal problem")
 
-        opt = OptimalProblem(name="opt")
+        opt = OptimalProblem(name="opt", use_last_result=True)
         opt.addOptimalVariables(self.opt_State)
         opt.addOptimalVariables(self.opt_Input)
         opt.addOptimalVariables(self.opt_dT)

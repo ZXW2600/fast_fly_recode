@@ -8,7 +8,7 @@ from fast_fly.utils.utils import flatten
 
 
 class OptimalVariables(Logger):
-    def __init__(self, name, default_init=None, default_ub=None, default_lb=None, param=False,headers=None) -> None:
+    def __init__(self, name, default_init=None, default_ub=None, default_lb=None, param=False, headers=None) -> None:
         super().__init__(name)
         self.state_list = []
         self.state_init_list = []
@@ -22,8 +22,7 @@ class OptimalVariables(Logger):
         self.default_ub = default_ub
         self.default_lb = default_lb
         self.param = param
-        self.headers=headers
-
+        self.headers = headers
 
     def addState(self, symbo, init=None, ub=None, lb=None):
         if init is None:
@@ -116,6 +115,12 @@ class OptimalConstraints(Logger):
                 self.error("lower bound value is not set")
                 raise ValueError("lower bound value is not set")
             lb = self.default_lb
+        constraint_len=constraint.size1()*constraint.size2()
+        
+        if constraint_len!=len(lb):
+            self.exception(f"constraint shape {constraint.shape} is not equal to lb shape {len(lb)}") #noqa
+        if constraint_len!=len(ub):
+            self.exception(f"constraint shape {constraint.shape} is not equal to ub shape {len(ub)}") #noqa
         self.g_list.append(constraint)
         self.g_ub_list.append(ub)
         self.g_lb_list.append(lb)
@@ -150,7 +155,7 @@ class OptimalObject(Logger):
 
 
 class OptimalProblem(Logger):
-    def __init__(self, name) -> None:
+    def __init__(self, name, use_last_result=False) -> None:
         self.name = name
         super().__init__(f"OP {name}")
         self.opt_var_dict: dict[OptimalVariables] = {}
@@ -158,6 +163,7 @@ class OptimalProblem(Logger):
         self.opt_obj_dict: dict[OptimalObject] = {}
         self.opt_param_dict: dict[OptimalVariables] = {}
         self.opt_option = {}
+        self.use_last_result = use_last_result
 
         self.result_var_slice = {}
 
@@ -176,7 +182,7 @@ class OptimalProblem(Logger):
     def setOptimalOption(self, option: dict):
         self.opt_option = option
 
-    def solve(self, warmup_problem=None):
+    def solve(self):
         self.info("start solve")
         self.x = []
         self.x0 = []
@@ -189,7 +195,10 @@ class OptimalProblem(Logger):
             slice_start = len(self.x0)
             vars: OptimalVariables
             self.x += vars.getSymbolicState()
-            self.x0 += flatten(vars.getInitState())
+            if self.use_last_result and vars.getResult() is not None:
+                self.x0 += vars.getResult().flatten().tolist()
+            else:
+                self.x0 += flatten(vars.getInitState())
             self.lbx += flatten(vars.getLowBound())
             self.ubx += flatten(vars.getUpBound())
             slice_end = len(self.x0)
@@ -215,6 +224,7 @@ class OptimalProblem(Logger):
         self.lbg = []
         self.ubg = []
         for key, cst in self.opt_cst_dict.items():
+
             cst: OptimalConstraints
             self.g += flatten(cst.g_list)
             self.lbg += flatten(cst.g_lb_list)

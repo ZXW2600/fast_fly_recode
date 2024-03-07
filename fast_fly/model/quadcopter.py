@@ -7,7 +7,7 @@ from fast_fly.utils.geometery import quat_mult, rotate_quat
 from fast_fly.utils.math import constrain
 from fast_fly.utils.integral import EulerIntegral, RK4
 from fast_fly.utils.yaml_helper import ConfigReader
-
+from fast_fly.utils.cacados import create_casados_integrator
 from acados_template import AcadosModel
 
 
@@ -160,6 +160,19 @@ class QuadrotorModel(object):
 
         return ca.Function("ddyn_t", [X0, U, dt], [X1], ["X0", "U", "dt"], ["X1"])
 
+    def set_up_cacados(self):
+        self.ca_model = self.cacados_model()
+        integrator_opts = {
+            "type": "implicit",
+            "collocation_scheme": "radau",
+            "num_stages": 6,
+            "num_steps": 3,
+            "newton_iter": 10,
+            "tol": 1e-6,
+        }
+        self.casados_integrator = create_casados_integrator(
+            self.ca_model, integrator_opts, dt=0.1)
+
     def cacados_model(self):
         px, py, pz = ca.SX.sym('px'), ca.SX.sym('py'), ca.SX.sym('pz')
         vx, vy, vz = ca.SX.sym('vx'), ca.SX.sym('vy'), ca.SX.sym('vz')
@@ -212,3 +225,6 @@ class QuadrotorModel(object):
         model.xdot = X_dot_sym
         model.name = 'quadcopter'
         return model
+
+    def cacados_discrete_constrain(self, X0, U0, dt):
+        self.casados_integrator(X0, U0)

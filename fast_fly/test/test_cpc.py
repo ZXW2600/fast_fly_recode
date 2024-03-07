@@ -18,8 +18,8 @@ csv_writer.writerow(["time", "x", "y", "z", "vx", "vy",
 
 
 def test_planner():
-    # yaml_path = os.path.join(os.path.dirname(package_path), "fast_fly/config/gates_n7_loop.yaml")  # noqa
-    yaml_path = os.path.join(os.path.dirname(package_path), "fast_fly/config/gates_n7.yaml")  # noqa
+    yaml_path = os.path.join(os.path.dirname(package_path), "fast_fly/config/gates_n7_loop.yaml")  # noqa
+    # yaml_path = os.path.join(os.path.dirname(package_path), "fast_fly/config/gates_n7.yaml")  # noqa
     gate_cfg = GateConfig(yaml_path)
 
     test_model = QuadrotorModel(
@@ -39,14 +39,20 @@ def test_planner():
         "ipopt.max_iter": 1000,
         # 'ipopt.warm_start_init_point': 'yes',
         # 'ipopt.print_level': 0,
-        "jit":True
+        # "jit":True
     }
     planner.setup()
     warmup = planner.getWarmupProblem()
     warmup.setOptimalOption(opt_option)
     warmup.solve()
     planner.saveWarmup("./result/warmup.csv")
-    planner.getOptimalProblem()
+    dt=planner.getOptimalProblem()
+    dt.setOptimalOption(opt_option)
+    dt.solve()
+    dt.solve()
+    dt.solve()
+    dt.solve()
+    planner.saveOptimal("./result/dt.csv")
 
 
 test_planner()
