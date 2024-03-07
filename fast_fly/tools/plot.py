@@ -31,6 +31,9 @@ with open(args.filename, newline="") as csvfile:
                 data[header[i]] += [float(row[i])]
         index += 1
     # print(data)
+# if dt data not exist, make on with dt=0.1
+if "dt" not in header:
+    data["dt"] = [0.1] * len(data["t"])
 
 # csv file header:
 # ['t', 'dt',

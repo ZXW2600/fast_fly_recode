@@ -1,5 +1,5 @@
 import csv
-from fast_fly.planner.cpc_dt import DronePathPlanner, dtConverter
+from fast_fly.planner.cpc_dt import DronePathPlanner
 from fast_fly.planner.optimal_helper import OptimalVariables
 from fast_fly.utils.gate import GateConfig
 from fast_fly.model.quadcopter import QuadrotorModel
@@ -39,7 +39,8 @@ def test_planner():
         "ipopt.max_iter": 1000,
         # 'ipopt.warm_start_init_point': 'yes',
         # 'ipopt.print_level': 0,
-        # "jit":True
+        # "jit":True,
+        # "ipopt.hessian_approximation": "limited-memory",
     }
     planner.setup()
     warmup = planner.getWarmupProblem()

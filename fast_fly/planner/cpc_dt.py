@@ -9,33 +9,6 @@ from fast_fly.utils.math import QuadraticError
 from fast_fly.planner.optimal_helper import OptimalConstraints, OptimalObject, OptimalProblem, OptimalQuadraticObject, OptimalVariables
 
 
-class dtConverter:
-    def __init__(self, Dt: np.ndarray, time_samples: list):
-        self.Dt = Dt
-        self.time_samples = time_samples
-        self.time_list = []
-        self.dt_list = []
-        if isinstance(Dt, list):
-            Dt = np.array(Dt)
-        if Dt.shape[0] != len(time_samples):
-            raise ValueError("Dt shape not match time samples")
-
-        for i, n_sample in enumerate(time_samples):
-            dT_i = Dt[i]
-            for j in range(n_sample):
-                self.dt_list.append(dT_i)
-
-        self.dt = np.array(self.dt_list)
-
-        self.time_list = np.cumsum(self.dt, axis=0)
-
-    def getdt(self):
-        return self.dt_list
-
-    def getTime(self):
-        return self.time_list
-
-
 class Trajectory:
     def __init__(self, state: OptimalVariables, input: OptimalVariables, dT: OptimalVariables, time_samples: list) -> None:
         self.state = state.getResult()
@@ -44,6 +17,8 @@ class Trajectory:
         self.dt_list = []
         if self.dT is None:
             self.dT = dT.getInitState()
+        if isinstance(self.dT, np.ndarray):
+            self.dT = self.dT.flatten().tolist()
         for i, n_sample in enumerate(time_samples):
             dT_i = self.dT[i]
             for j in range(n_sample):
